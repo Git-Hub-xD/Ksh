@@ -1,6 +1,5 @@
 import random
 import time
-from config import app
 from pyrogram import filters
 from threading import Timer
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
