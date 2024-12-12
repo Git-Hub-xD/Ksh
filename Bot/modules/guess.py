@@ -3,8 +3,10 @@ import time
 from pyrogram import filters
 from threading import Timer
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
-from Bot.KEYS import current_game, join_timers
 
+# Game data storage
+current_game = {}  # Stores game data for each chat
+join_timers = {}  # Timers for the join phase
 
 def reset_game(chat_id):
     """Reset the game data for a chat."""
