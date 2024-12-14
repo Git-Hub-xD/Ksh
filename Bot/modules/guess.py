@@ -1,7 +1,8 @@
 import random
 from threading import Timer
 from pyrogram import filters
-from config import app  # Import the shared app instance
+from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from config import app  # Ensure `app` is initialized in `config.py`
 
 # Game data storage
 current_game = {}  # Stores game data for each chat
@@ -19,7 +20,7 @@ def reset_game(chat_id):
 
 @app.on_message(filters.command("newguess"))
 def newguess_handler(client, message):
-    """Handle /newguess command to start a game."""
+    """Handle /newguess command to start a new game."""
     chat_id = message.chat.id
     user_id = message.from_user.id
 
@@ -27,10 +28,11 @@ def newguess_handler(client, message):
         message.reply("A game is already active in this chat. Use /cancelguess to cancel it first.")
         return
 
+    # Initialize game data
     current_game[chat_id] = {
         "host": user_id,
         "players": {user_id: message.from_user.first_name},
-        "difficulty": None,
+        "difficulty": "medium",  # Default difficulty
         "target_number": None,
         "turn_order": [],
         "current_turn": 0,
@@ -38,6 +40,7 @@ def newguess_handler(client, message):
         "game_active": False,
     }
 
+    # Notify and start join phase
     message.reply(
         f"🎮 **Guess the Number Game Started by {message.from_user.first_name}!**\n"
         "Players, join the game using /joinguess.\n"
@@ -45,7 +48,8 @@ def newguess_handler(client, message):
         "Minimum players: 2 | Maximum players: No limit."
     )
 
-    join_timers[chat_id] = Timer(60.0, start_game_automatically, args=(client, chat_id, message))
+    # Set a 60-second timer for auto-start
+    join_timers[chat_id] = Timer(60.0, start_game_automatically, args=(chat_id, message))
     join_timers[chat_id].start()
 
 
@@ -63,11 +67,12 @@ def joinguess_handler(client, message):
         message.reply("You are already in the game.")
         return
 
+    # Add player to the game
     current_game[chat_id]["players"][user_id] = message.from_user.first_name
     message.reply(f"{message.from_user.first_name} has joined the game!")
 
 
-def start_game_automatically(client, chat_id, message):
+def start_game_automatically(chat_id, message):
     """Automatically start the game after the join phase."""
     if chat_id not in current_game or current_game[chat_id]["game_active"]:
         return
@@ -77,7 +82,7 @@ def start_game_automatically(client, chat_id, message):
         reset_game(chat_id)
         return
 
-    start_guessing_game(client, chat_id, message)
+    start_guessing_game(chat_id, message)
 
 
 @app.on_message(filters.command("forceguess"))
@@ -98,7 +103,7 @@ def forceguess_handler(client, message):
         message.reply("Not enough players to start the game. Minimum players required: 2.")
         return
 
-    start_guessing_game(client, chat_id, message)
+    start_guessing_game(chat_id, message)
 
 
 @app.on_message(filters.command("cancelguess"))
@@ -117,6 +122,44 @@ def cancelguess_handler(client, message):
 
     reset_game(chat_id)
     message.reply("The game has been canceled.")
+
+
+def start_guessing_game(chat_id, message):
+    """Start the actual guessing game after the join phase."""
+    game = current_game[chat_id]
+    players = list(game["players"].keys())
+    random.shuffle(players)
+
+    # Initialize game details
+    game["turn_order"] = players
+    game["current_turn"] = 0
+    game["game_active"] = True
+    game["attempts"] = {player: 0 for player in players}
+
+    # Set target number and difficulty parameters
+    difficulty = game["difficulty"]
+    if difficulty == "easy":
+        game["target_number"] = random.randint(1, 50)
+        game["max_attempts"] = 10
+        game["reward"] = 10
+    elif difficulty == "medium":
+        game["target_number"] = random.randint(1, 100)
+        game["max_attempts"] = 8
+        game["reward"] = 30
+    elif difficulty == "hard":
+        game["target_number"] = random.randint(1, 200)
+        game["max_attempts"] = 5
+        game["reward"] = 50
+
+    # Notify players
+    message.reply(
+        f"🎉 **The game has started!**\n"
+        f"Difficulty: {difficulty.capitalize()}\n"
+        f"Target Number Range: 1-{game['target_number']}\n"
+        f"Reward: {game['reward']} points\n\n"
+        f"First player: {game['players'][game['turn_order'][0]]}.\n"
+        "Good luck!"
+    )
 
 
 @app.on_message(filters.text & filters.group)
@@ -138,18 +181,24 @@ def guess_number_handler(client, message):
         message.reply("It's not your turn!")
         return
 
+    # Process the guess
     try:
         guess = int(message.text.split()[1])
     except (IndexError, ValueError):
         message.reply("Please provide a valid number.")
         return
 
+    game["attempts"][user_id] += 1
+
     if guess == game["target_number"]:
         message.reply(f"🎉 {game['players'][user_id]} guessed the number {guess} correctly!")
+        from database.db_manager import update_points
+        update_points(user_id, game["reward"])
         reset_game(chat_id)
     elif guess < game["target_number"]:
         message.reply(f"The number is higher than {guess}.")
     else:
         message.reply(f"The number is lower than {guess}.")
 
+    # Move to the next player's turn
     game["current_turn"] = (game["current_turn"] + 1) % len(game["turn_order"])
