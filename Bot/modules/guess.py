@@ -1,13 +1,14 @@
 import random
 import time
-from pyrogram import Client, filters
 from threading import Timer
-from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
-from config import app
+from pyrogram import filters
+from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from config import app  # Assuming `app` is initialized in `config.py`
 
 # Game data storage
 current_game = {}  # Stores game data for each chat
 join_timers = {}  # Timers for the join phase
+
 
 def reset_game(chat_id):
     """Reset the game data for a chat."""
@@ -16,10 +17,11 @@ def reset_game(chat_id):
     if chat_id in join_timers:
         join_timers[chat_id].cancel()
         del join_timers[chat_id]
-        
 
-def start_game(client, message):
-    """Handle /newguess command to start a game."""
+
+@app.on_message(filters.command("newguess"))
+def newguess_handler(client, message):
+    """Handle /newguess command to start a new game."""
     chat_id = message.chat.id
     user_id = message.from_user.id
 
@@ -51,7 +53,8 @@ def start_game(client, message):
     join_timers[chat_id].start()
 
 
-def join_game(client, message):
+@app.on_message(filters.command("joinguess"))
+def joinguess_handler(client, message):
     """Handle /joinguess command to join a game."""
     chat_id = message.chat.id
     user_id = message.from_user.id
@@ -81,7 +84,8 @@ def start_game_automatically(client, chat_id, message):
     start_guessing_game(client, chat_id, message)
 
 
-def force_start_game(client, message):
+@app.on_message(filters.command("forceguess"))
+def forceguess_handler(client, message):
     """Handle /forceguess command to start the game manually."""
     chat_id = message.chat.id
     user_id = message.from_user.id
@@ -101,8 +105,9 @@ def force_start_game(client, message):
     start_guessing_game(client, chat_id, message)
 
 
-def cancel_game(client, message):
-    """Handle /cancelguess command to cancel the game."""
+@app.on_message(filters.command("cancelguess"))
+def cancelguess_handler(client, message):
+    """Handle /cancelguess command to cancel a game."""
     chat_id = message.chat.id
     user_id = message.from_user.id
 
@@ -154,8 +159,9 @@ def start_guessing_game(client, chat_id, message):
     )
 
 
-def process_guess(client, message):
-    """Process a player's guess."""
+@app.on_message(filters.text & filters.group)
+def guess_number_handler(client, message):
+    """Handle guesses from players."""
     chat_id = message.chat.id
     user_id = message.from_user.id
 
@@ -182,7 +188,6 @@ def process_guess(client, message):
 
     if guess == game["target_number"]:
         message.reply(f"🎉 {game['players'][user_id]} guessed the number {guess} correctly!")
-        # Reward the player
         from database.db_manager import update_points
         update_points(user_id, game["reward"])
         reset_game(chat_id)
