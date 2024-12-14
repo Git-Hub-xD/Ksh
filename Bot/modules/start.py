@@ -6,7 +6,6 @@ from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, Message
 from Bot.modules.flood_control import check_flood
 from Bot.modules.leveling import level_up
 from Bot.modules.shop import get_shop_page, handle_purchase
-from Bot.modules.guess import start_game, join_game, force_start_game, cancel_game, process_guess 
 from database.db_manager import create_db, add_user, ensure_user_exists, get_user, update_points, update_level, update_health, connect_db
 
 create_db()  # Ensure the table is created if it doesn't exist
@@ -53,33 +52,6 @@ def start_handler(client, message):
     if user_data is None:
         add_user(user_id, username)
         user_data = get_user(user_id)
-
-# Guess The Number - Game
-@app.on_message(filters.command("newguess"))
-def newguess_handler(client, message):
-    """Handle the /newguess command to start a new game."""
-    start_game(client, message)
-
-@app.on_message(filters.command("joinguess"))
-def joinguess_handler(client, message):
-    """Handle the /joinguess command to join a game."""
-    join_game(client, message)
-
-@app.on_message(filters.command("forceguess"))
-def forceguess_handler(client, message):
-    """Handle the /forceguess command to force start a game."""
-    force_start_game(client, message)
-
-@app.on_message(filters.command("cancelguess"))
-def cancelguess_handler(client, message):
-    """Handle the /cancelguess command to cancel a game."""
-    cancel_game(client, message)
-
-@app.on_message(filters.text & filters.group)
-def guess_number_handler(client, message):
-    """Handle guesses from players."""
-    if message.text.startswith("/guess"):
-        process_guess(client, message)
          
 # Shop
 @app.on_message(filters.command("shop"))
